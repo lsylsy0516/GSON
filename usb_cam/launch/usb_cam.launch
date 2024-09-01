@@ -1,0 +1,13 @@
+<launch>
+  <node name="usb_cam_l" pkg="usb_cam" type="usb_cam_node" output="screen" >
+    <rosparam command="load" file="$(find usb_cam)/config/l_usb_cam.yml"/>
+  </node>
+  
+ <node name="usb_cam_r" pkg="usb_cam" type="usb_cam_node" output="screen" >
+    <rosparam command="load" file="$(find usb_cam)/config/r_usb_cam.yml"/>
+  </node>
+
+
+    <node name="cam_tf_pub" pkg="usb_cam" type="pub_tf.py" output="screen" >
+    </node>
+</launch>

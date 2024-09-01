@@ -1,0 +1,29 @@
+<launch>
+
+  <include file="$(find dr_spaam_ros)/launch/dr_spaam_ros.launch"/>
+
+  <node name="join_pic" pkg="perception_module" type="join_pic.py" output="screen" />
+
+  <include file="$(find yolov5_ros)/launch/yolov5.launch">
+    <arg name="line_thickness" value="1" />
+    <arg name="publish_image" value="true" />
+    <arg name="input_image_topic" value="/merged_image" />
+  </include>
+
+  <arg name="if_not_debug" default="false" />
+  <group if="$(arg if_not_debug)">
+    <include file="$(find usb_cam)/launch/usb_cam.launch" />
+  </group>
+
+  <group unless="$(arg if_not_debug)">
+    <node name="map_server" pkg="map_server" type="map_server" args="$(find perception_module)/maps/0409_1.yaml" required="true" output="screen" />
+  </group>
+
+
+  <node name="detector" pkg="perception_module" type="detector.py" output="screen" />
+
+  <!-- add rviz -->
+  <!-- <node name="percept_rviz" pkg="rviz" type="rviz" args="-d $(find perception_module)/rviz/2.rviz" required="true" output="screen" /> -->
+
+
+</launch>

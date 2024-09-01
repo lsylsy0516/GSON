@@ -1,0 +1,17 @@
+
+{
+    "left_info_topic": "/usb_cam_l/camera_info",
+    "right_info_topic": "/usb_cam_r/camera_info",
+    
+    "laser_frame": "laser_frame",
+    "left_camera_frame": "usb_cam_l",
+    "right_camera_frame": "usb_cam_r",
+    
+    "image_topic": "/yolov5/image_out",
+    "det_topic": "/tracker",
+    "BoundingBoxes_topic": "/yolov5/detections",
+    "global_frame": "map",
+    "frame_lenth": 30,
+    "keep_time": 10,
+    "folder_path":"/keyframes/"
+}
