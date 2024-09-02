@@ -1,4 +1,4 @@
-#!/home/luo/miniconda3/envs/percept/bin/python
+#!/home/sp/miniconda3/envs/percept/bin/python
 
 from detection_msgs.msg import tracks,mapping
 from sensor_msgs.msg import CameraInfo

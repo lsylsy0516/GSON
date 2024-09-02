@@ -1,4 +1,4 @@
-#!/home/luo/miniconda3/envs/percept/bin/python
+#!/home/sp/miniconda3/envs/percept/bin/python
 import rospy
 from dr_spaam_ros.dr_spaam_ros import DrSpaamROS
 

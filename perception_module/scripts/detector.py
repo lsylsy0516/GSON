@@ -1,4 +1,4 @@
-#!/home/luo/miniconda3/envs/percept/bin/python
+#!/home/sp/miniconda3/envs/percept/bin/python
 
 # from utils.group import group as gemini_group
 from utils.gpt4 import group as gemini_group   # gpt4o

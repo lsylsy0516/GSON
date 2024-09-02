@@ -1,4 +1,4 @@
-#!/home/luo/miniconda3/envs/percept/bin/python
+#!/home/sp/miniconda3/envs/percept/bin/python
 
 import rospy 
 import cv2

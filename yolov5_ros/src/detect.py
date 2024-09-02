@@ -1,4 +1,4 @@
-#!/home/luo/miniconda3/envs/percept/bin/python
+#!/home/sp/miniconda3/envs/percept/bin/python
 
 import sys
 import rospy
@@ -23,7 +23,7 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 # from ultralytics.utils.plotting import Annotator, colors, save_one_box
 from utils.my_plotting import Annotator, colors, save_one_box
-
+from utils.augmentations import letterbox
 from models.common import DetectMultiBackend
 from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadScreenshots, LoadStreams
 from utils.general import (
@@ -44,6 +44,31 @@ from utils.general import (
 )
 from utils.torch_utils import select_device, smart_inference_mode
 
+def clip_coords(boxes, shape):
+    # Clip bounding xyxy bounding boxes to image shape (height, width)
+    if isinstance(boxes, torch.Tensor):  # faster individually
+        boxes[:, 0].clamp_(0, shape[1])  # x1
+        boxes[:, 1].clamp_(0, shape[0])  # y1
+        boxes[:, 2].clamp_(0, shape[1])  # x2
+        boxes[:, 3].clamp_(0, shape[0])  # y2
+    else:  # np.array (faster grouped)
+        boxes[:, [0, 2]] = boxes[:, [0, 2]].clip(0, shape[1])  # x1, x2
+        boxes[:, [1, 3]] = boxes[:, [1, 3]].clip(0, shape[0])  # y1, y2
+
+def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None):
+    # Rescale coords (xyxy) from img1_shape to img0_shape
+    if ratio_pad is None:  # calculate from img0_shape
+        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
+        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
+    else:
+        gain = ratio_pad[0][0]
+        pad = ratio_pad[1]
+
+    coords[:, [0, 2]] -= pad[0]  # x padding
+    coords[:, [1, 3]] -= pad[1]  # y padding
+    coords[:, :4] /= gain
+    clip_coords(coords, img0_shape)
+    return coords
 
 @torch.no_grad()
 class Yolov5Detector:
@@ -110,6 +135,18 @@ class Yolov5Detector:
         
         # Initialize CV_Bridge
         self.bridge = CvBridge()
+
+    def preprocess(self, img):
+        """
+        Adapted from yolov5/utils/datasets.py LoadStreams class
+        """
+        img0 = img.copy()
+        img = np.array([letterbox(img, self.img_size, stride=self.stride, auto=self.pt)[0]])
+        # Convert
+        img = img[..., ::-1].transpose((0, 3, 1, 2))  # BGR to RGB, BHWC to BCHW
+        img = np.ascontiguousarray(img)
+
+        return img, img0 
 
     def callback(self, data):
         if self.compressed_input:
