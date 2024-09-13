@@ -27,7 +27,7 @@ class Track(object):
             None
         """
         self.track_id = trackIdCount  # identification of each track object
-        self.KF = KalmanFilter(dt=0.1,
+        self.KF = KalmanFilter(dt=(0.2),
                                future_step=kf_future_step,
                                init_state=np.array([prediction[0][0],prediction[1][0],0,0]),
                                process_noise_std=kf_process_noise,
@@ -153,6 +153,16 @@ class Tracker(object):
         # Start new tracks
         if(len(un_assigned_detects) != 0):
             for i in range(len(un_assigned_detects)):
+                detection = detections[un_assigned_detects[i]]
+                if_start = True
+                for track in self.tracks:
+                    dis = np.sqrt((track.prediction[0][0] - detection[0][0])**2 + (track.prediction[1][0] - detection[1][0])**2)
+                    # print("dis:",dis)
+                    if dis < 0.4:
+                        if_start = False
+                        break
+                if if_start == False:
+                    continue
                 track = Track(detections[un_assigned_detects[i]],
                               self.trackIdCount,self.predict_step,self.kf_process_noise,self.kf_measurement_noise)
                 self.trackIdCount += 1

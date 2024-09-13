@@ -36,13 +36,13 @@ class Tracker_Module:
         self.map_sub = rospy.Subscriber("/map", OccupancyGrid, self.Global_map_callback,queue_size=10)
 
         self.tracker = Tracker(
-            dist_thresh = 0.3,
-            max_frames_to_skip = 30,
+            dist_thresh = 0.7,
+            max_frames_to_skip = 20,
             max_trace_length = 3,
             trackIdCount = 0,
             predict_step = 6,
             kf_measurement_noise = 0.1,
-            kf_process_noise = 0.2
+            kf_process_noise = 0.3
         )
         rospy.loginfo("Tracker init success")
 
@@ -55,6 +55,7 @@ class Tracker_Module:
 
     def Dynamic_obstacles_cb(self,msg:PoseArray):
         if msg.poses == []: # if there is no dynamic obstacles 
+            # rospy.loginfo("no obstacles detected!")
             return [],[]
         
         # 删去重复的Pose
@@ -96,7 +97,7 @@ class Tracker_Module:
             local_x = msg.poses[i].position.x
             local_y = msg.poses[i].position.y 
 
-            if local_x**2 + local_y**2 > 100:# 如果距离大于8m,则不追踪
+            if local_x**2 + local_y**2 > 81:# 如果距离大于8m,则不追踪
                 continue
 
 
@@ -171,34 +172,34 @@ class Tracker_Module:
 
 
 
-        if self.if_visualization:
-            # print("track:",len(self.tracker.tracks))
+        # if self.if_visualization:
+        #     # print("track:",len(self.tracker.tracks))
 
-            for i in range(len(self.tracker.tracks)):
-                est_x = self.tracker.tracks[i].KF.state[0]
-                est_y = self.tracker.tracks[i].KF.state[1]
-                cv2.circle(map,(int(est_y*20),int(est_x*20)),int(7),(255,0,0)) # 蓝色代表预测的位置
+        #     for i in range(len(self.tracker.tracks)):
+        #         est_x = self.tracker.tracks[i].KF.state[0]
+        #         est_y = self.tracker.tracks[i].KF.state[1]
+        #         cv2.circle(map,(int(est_y*20),int(est_x*20)),int(7),(255,0,0)) # 蓝色代表预测的位置
 
-                for k in range(len(self.tracker.tracks[i].KF.future_states)):
-                    x = self.tracker.tracks[i].KF.future_states[k][0]
-                    y = self.tracker.tracks[i].KF.future_states[k][1]
-                    cv2.circle(map,(int(y*20),int(x*20)),int(7),(255,0,0))  # 蓝色代表预测的位置
+        #         for k in range(len(self.tracker.tracks[i].KF.future_states)):
+        #             x = self.tracker.tracks[i].KF.future_states[k][0]
+        #             y = self.tracker.tracks[i].KF.future_states[k][1]
+        #             cv2.circle(map,(int(y*20),int(x*20)),int(7),(255,0,0))  # 蓝色代表预测的位置
 
 
             
-                if (len(self.tracker.tracks[i].trace) > 1): # 若轨迹长度大于1，则画出轨迹
-                    for j in range(len(self.tracker.tracks[i].trace)-1):
-                        # Draw trace line
-                        x1 = self.tracker.tracks[i].trace[j][0][0]
-                        y1 = self.tracker.tracmarker_msgks[i].trace[j][1][0]
-                        x2 = self.tracker.tracks[i].trace[j+1][0][0]
-                        y2 = self.tracker.tracks[i].trace[j+1][1][0]
-                        cv2.line(map, (int(y1*20), int(x1*20)), (int(y2*20), int(x2*20)),(255,0,255), 2)
+        #         if (len(self.tracker.tracks[i].trace) > 1): # 若轨迹长度大于1，则画出轨迹
+        #             for j in range(len(self.tracker.tracks[i].trace)-1):
+        #                 # Draw trace line
+        #                 x1 = self.tracker.tracks[i].trace[j][0][0]
+        #                 y1 = self.tracker.tracmarker_msgks[i].trace[j][1][0]
+        #                 x2 = self.tracker.tracks[i].trace[j+1][0][0]
+        #                 y2 = self.tracker.tracks[i].trace[j+1][1][0]
+        #                 cv2.line(map, (int(y1*20), int(x1*20)), (int(y2*20), int(x2*20)),(255,0,255), 2)
 
-            cv2.imshow("map.png",map)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                rospy.signal_shutdown("shutdown")
-                return   
+        #     cv2.imshow("map.png",map)
+        #     if cv2.waitKey(1) & 0xFF == ord('q'):
+        #         rospy.signal_shutdown("shutdown")
+        #         return   
 
         track_id_list = []
         track_pose_list = []
@@ -225,8 +226,8 @@ class Tracker_Module:
 if __name__ == '__main__':
     rospy.init_node("tracker_test")
     tracker_test = Tracker_Module(if_visualization=False,if_publish=True)
-    # rospy.Subscriber("/removed_detections",PoseArray,tracker_test.Dynamic_obstacles_cb)
-    rospy.Subscriber("/dr_spaam_detections",PoseArray,tracker_test.Dynamic_obstacles_cb)
+    rospy.Subscriber("/removed_detections",PoseArray,tracker_test.Dynamic_obstacles_cb)
+    # rospy.Subscriber("/dr_spaam_detections",PoseArray,tracker_test.Dynamic_obstacles_cb)
     tracker_test.run()
     rospy.spin()
 

@@ -199,7 +199,7 @@ class Yolov5Detector:
                 # Annotate the image
                 if self.publish_image or self.view_image:  # Add bbox to image
                       # integer class
-                    label = f"{self.names[c]} {conf:.2f}"
+                    label = f""
                     annotator.box_label(xyxy, label, color=colors(c, True))       
 
                 

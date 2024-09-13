@@ -7,7 +7,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 import tf.transformations as tf_trans
 from sensor_msgs.msg import Image, CameraInfo
 from geometry_msgs.msg import PoseArray,PoseStamped,Pose
-from detection_msgs.msg import BoundingBoxes,BoundingBox,mapping,Group,Groups
+from detection_msgs.msg import BoundingBoxes,BoundingBox,mapping,Group,Groups,tracks
 from cv_bridge import CvBridge, CvBridgeError
 from collections import deque
 from datetime import datetime
@@ -64,7 +64,7 @@ class Detector_Config:
         with open(config_path, 'r') as f:
             self.config = json.load(f)
 
-        self.folder_path = package_path+ self.config["folder_path"] + datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        self.folder_path = package_path+ self.config["folder_path"] + datetime.now().strftime("%Y-%m-%d_%H%M%S")+"/"
 
         self.frames = deque(maxlen=self.config["frame_lenth"])
 
@@ -89,7 +89,7 @@ class Detector:
     def __init__(self) -> None:
 
         # 初始化配置
-        config_path = package_path + "config/detector_config.json"
+        config_path = package_path + "/config/detector_config.json"
         self.config_module = Detector_Config(config_path)
 
         # 其他初始化代码
@@ -109,17 +109,18 @@ class Detector:
     def _initialize_Sub_Pub(self):
         # the only publisher we need
         self.group_pub = rospy.Publisher("group", Groups, queue_size=1)
-
-        self.gpt_flag_sub = rospy.Subscriber("/middle_flag",Bool,self.gpt_flag_cb)
+        self.yolo_pub = rospy.Publisher("yolo/tracks",tracks,queue_size=1)
+        self.gpt_flag_sub = rospy.Subscriber("/llm_flag",Bool,self.gpt_flag_cb)
         self.stop_flag_pub = rospy.Publisher("/stop_flag",Bool,queue_size=1)
+        
         self.left_map_sub = message_filters.Subscriber("/mapping/left", mapping)
         self.right_map_sub = message_filters.Subscriber("/mapping/right", mapping)
         ts = message_filters.TimeSynchronizer([self.left_map_sub,self.right_map_sub], 10)
         ts.registerCallback(self._mapping_cb)
 
-        self.image_sub = message_filters.Subscriber(self.config_module.config["image_topic"], Image)
+        imageage_sub = message_filters.Subscriber(self.config_module.config["image_topic"], Image)
         self.bounding_boxes_sub = message_filters.Subscriber(self.config_module.config["BoundingBoxes_topic"], BoundingBoxes)
-        ts2 = message_filters.TimeSynchronizer([self.image_sub,self.bounding_boxes_sub], 10)
+        ts2 = message_filters.TimeSynchronizer([imageage_sub,self.bounding_boxes_sub], 10)
         ts2.registerCallback(self._bounding_boxes_cb)
         self.group_sub = rospy.Subscriber("/test_group",String,self.group_test_cb)
 
@@ -132,61 +133,10 @@ class Detector:
         thread_get_group.start()
 
     def gpt_flag_cb(self,msg:Bool):
-        if msg.data == False:
-            try:
-                # 获取keyframe里面的所有id
-                id_in_keyframe = [id for [id,_,_,_] in self.config_module.cur_frame[1]]
-
-                if id_in_keyframe == [] or len(id_in_keyframe) == 1:
-                    # rospy.loginfo("No keyframe")
-                    # 不会发布stop_flag
-                    return
-                else: 
-                    # keyframe里面的id不在id_already_met里面
-                    for id in id_in_keyframe:
-                        if id not in self.config_module.id_already_met:
-                            rospy.loginfo("id not in id_already_met")
-                            rospy.loginfo("id: %d",id)
-                            rospy.loginfo("id_already_met: %s",self.config_module.id_already_met)
-                            # 添加整个id_in_keyframe到id_already_met
-                            self.config_module.id_already_met.extend(id_in_keyframe)
-                            # 停下来
-                            stop_flag = Bool()
-                            stop_flag.data = True
-                            self.stop_flag_pub.publish(stop_flag)
-
-                            rospy.loginfo("Save keyframe and publish group")
-                            keyframe = self.config_module.keyframe.copy()
-                            self._pub_group(keyframe)
-                            return
-                    # keyframe里面的id都在id_already_met里面
-                    # rospy.loginfo("id in id_already_met")
-                    return
-            except Exception as e:
-                rospy.logwarn(e)
-    # def gpt_flag_cb(self,msg:Bool):
-    #     rospy.loginfo("Get gpt_flag: %s",msg.data)
-    #     if msg.data == False:
-    #         try:
-    #             # 获取keyframe里面的所有id
-    #             id_in_keyframe = [id for [id,_,_,_] in self.config_module.cur_frame[1]]
-
-    #             if id_in_keyframe == [] or len(id_in_keyframe) == 1:
-    #                 # rospy.loginfo("No keyframe")
-    #                 # 不会发布stop_flag
-    #                 return
-    #             else: 
-    #                 # 停下来
-    #                 stop_flag = Bool()
-    #                 stop_flag.data = True
-    #                 self.stop_flag_pub.publish(stop_flag)
-
-    #                 rospy.loginfo("Save keyframe and publish group")
-    #                 keyframe = self.config_module.keyframe.copy()
-    #                 self._pub_group(keyframe)
-    #                 return
-    #         except Exception as e:
-    #             rospy.logwarn(e)
+        if msg.data == True: 
+            cur_frame = self.config_module.cur_frame.copy()
+            self._pub_group(cur_frame)
+            return
 
     def _get_group(self):
         while not rospy.is_shutdown():
@@ -200,19 +150,13 @@ class Detector:
         try:
             image_path = self.config_module.folder_path+str(self.config_module.keyframe_count) +".jpg"
             cv2.imwrite(image_path,keyframe[0])
-            # self.config_module.group_list = gemini_group(image_path)
-            ## 修改为直到group_list不为空为止
-            # 第一次获取group_list
+            rospy.loginfo(f"save keyframe: {image_path}")
+            id_list = [id for [id,_,_,_] in keyframe[1]]
+            id_list = list(dict.fromkeys(id_list))
+            # while self.config_module.group_list == []:
+            self.config_module.group_list = gemini_group(image_path,id_list)
             
-            while self.config_module.group_list == []:
-                self.config_module.group_list = gemini_group(image_path)
-                rospy.loginfo("Get group_list")
-            # id_list = [id for [id,_,_,_] in keyframe[1]]
-            # self.config_module.group_list =[id_list] # [[id,pose,vel_x,vel_y]]
-
-            # delay 2s
-            # rospy.loginfo("Delay 2s")
-            # time.sleep(2)
+            rospy.loginfo(f"Get group_list:{self.config_module.group_list}")
             rospy.loginfo("Publish group")
             groups_msg = Groups()
             groups_msg.header.stamp = keyframe[2]
@@ -235,24 +179,10 @@ class Detector:
                         group_msg.group_vel_x_list.append(vel_x)
                         group_msg.group_vel_y_list.append(vel_y)
                         count += 1
-                if count < 2:
-                    continue
-                else:
-                    groups_msg.group_list.append(group_msg)
-            # rospy.loginfo(groups_msg)
-            rospy.loginfo(groups_msg)
+                groups_msg.group_list.append(group_msg)
             if len(groups_msg.group_list) == 0:
                 rospy.loginfo("No group")
-                stop_flag = Bool()
-                stop_flag.data = False
-                self.stop_flag_pub.publish(stop_flag)
-                return
             self.group_pub.publish(groups_msg)
-
-            stop_flag = Bool()
-            stop_flag.data = False
-            self.stop_flag_pub.publish(stop_flag)
-            
             # 变换重置
             self.config_module.group_list = []
 
@@ -264,9 +194,6 @@ class Detector:
     def group_test_cb(self,msg:String):
         group = msg.data.split()
         group_list = [[int(i) for i in group]]
-        rospy.loginfo("Get group test")
-        rospy.loginfo(group_list)
-        rospy.loginfo("id in frame")
         for [id,pose,vel_x,vel_y] in self.config_module.keyframe[1]:
             rospy.loginfo(id)
         keyframe = self.config_module.keyframe.copy()
@@ -327,7 +254,6 @@ class Detector:
 
     def _set_frame(self):
         if len(self.config_module.bounding_boxes_frames.datas) == 0 or len(self.config_module.mapping_frames.datas)== 0:
-            # rospy.loginfo("No frame")
             return  False
         else:
             boundingboxes_frame = self.config_module.bounding_boxes_frames.datas[-1]
@@ -345,8 +271,7 @@ class Detector:
             self.config_module.frames.append(self.config_module.cur_frame)
             return True
     
-    @staticmethod
-    def auto_remove(frame): # list[Image,BoundingBoxes,Mapping_frame]
+    def auto_remove(self,frame): # list[Image,BoundingBoxes,Mapping_frame]
         image = frame[0]
         boundingboxes = frame[1]
         mapping_frame = frame[2] # Mapping_frame
@@ -367,17 +292,20 @@ class Detector:
             boundingbox:BoundingBox
             if boundingbox.Class != "person":
                 continue
+            # if abs(boundingbox.xmax - 640) < 10 or  abs(boundingbox.xmin - 640) < 10 or abs(boundingbox.xmax - 1280) < 10 or abs(boundingbox.xmin - 0) < 10:
+            #     continue
             boundingbox_index = -1
             for i in range(len(mapping_frame.id_list)):
-                thre = 0.2
+                thre = 0.15
                 x_thre = (boundingbox.xmax - boundingbox.xmin) * thre
                 if boundingbox.xmin <= (mapping_frame.points[i][0] - x_thre) and (mapping_frame.points[i][0]<= boundingbox.xmax+x_thre) and boundingbox.ymin <= mapping_frame.points[i][1] and mapping_frame.points[i][1] <= boundingbox.ymax:             
-                    # cv2.circle(image,(int(mapping_frame.points[i][0]),int(mappingframe.points[i][1])),3,(0,255,0),-1)
+                    # cv2.circle(image,(int(mapping_frame.points[i][0]),int(mapping_frame.points[i][1])),3,(0,255,0),-1)
                     # cv2.putText(image,str(mapping_frame.id_list[i]),(int(mapping_frame.points[i][0]),int(mapping_frame.points[i][1])),cv2.FONT_HERSHEY_SIMPLEX,1,(0,255,0),2)
 
                     if boundingbox_index == -1 or mapping_frame.points[i][1] <= mapping_frame.points[boundingbox_index][1]:
                         boundingbox_index = i
-
+            if boundingbox_index == -1:
+                continue
             # if boundingbox_index == 0:
             #     box_size = 10
             #     center_x = int((boundingbox.xmin + boundingbox.xmax) / 2)
@@ -391,24 +319,50 @@ class Detector:
             pose_list.append(mapping_frame.pose_array[boundingbox_index])
             vel_x_list.append(mapping_frame.vel_x_list[boundingbox_index])
             vel_y_list.append(mapping_frame.vel_y_list[boundingbox_index])
-            # cv2.putText(image,str(boundingbox_id),(int((boundingbox.xmin+boundingbox.xmax)/2),int((boundingbox.ymin+boundingbox.ymax)/2)),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,255),2)
-            # 设置boundingbox 中心部分为黑底
-            # center_x = int((boundingbox.xmin + boundingbox.xmax) / 2)
-            # center_y = int((boundingbox.ymin + boundingbox.ymax) / 2)
-            # box_size = 10
-            # cv2.rectangle(image, (center_x - box_size, center_y - 2*box_size), (center_x + 2* box_size, center_y + box_size), (0, 0, 0), -1)
-            # # 设置为白字，同时起始点向左边移动3个像素以居中显示
-            # cv2.putText(image, str(boundingbox_id), ( center_x-5, center_y), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255),1)
-            # 设置在右上角显示id
-            cv2.rectangle(image, (boundingbox.xmax, boundingbox.ymin), (boundingbox.xmax+30, boundingbox.ymin+20), (0, 0, 0), -1)
-            cv2.putText(image, str(boundingbox_id), (boundingbox.xmax+5, boundingbox.ymin+15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255),1)
-            
-        for i in range (len(mapping_frame.id_list)):
-            if i not in id_list:
-                pass
-                # cv2.putText(image,str(mapping_frame.id_list[i]),(int(mapping_frame.points[i][0]),int(mapping_frame.points[i][1])),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,255,0),2)
 
+            label = str(boundingbox_id)
+            w, h = cv2.getTextSize(label, 0, fontScale=1, thickness=1)[0]  # text width, height
+            p1, p2 = (int(boundingbox.xmin), int(boundingbox.ymin)), (int(boundingbox.xmax), int(boundingbox.ymax)) 
+            center_x = p1[0] + (p2[0] - p1[0]) // 2  # 边界框的中心x位置
+            p1 = (center_x - w // 2, p1[1] + h)  # 调整标签位置，居中对齐
+            if p1[0] < 0:  # 防止标签超出左边界
+                p1 = (0, p1[1])
+            if p1[0] + w > image.shape[1]:  # 防止标签超出右边界
+                p1 = (image.shape[1] - w, p1[1])
+            p2 = p1[0] + w, p1[1] -2* h 
+            if p2[1] > 0:
+                p1 = (p1[0], p1[1] - h)
+                cv2.rectangle(image, p1, p2, [255,0,0], -1, cv2.LINE_AA)  # filled
+            else:
+                p2 = p1[0] + w, p1[1] 
+                p1 = (p1[0], p1[1])
+                cv2.rectangle(image, (p1[0], p1[1] - h), p2, [255,0,0], -1, cv2.LINE_AA)  # filled
+        
+            cv2.putText(
+                image,
+                label,
+                p1,  # 根据新的位置调整文本
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (255, 255, 255),
+                thickness=2,
+                lineType=cv2.LINE_AA,
+            )
+        
+        yolo_msg = tracks()
+        id_list = list(set(id_list))
+        for i in range(len(id_list)):
+                # track_id_list
+                yolo_msg.track_id_list.append(id_list[i])
+                
+                # track_pose_list
+                yolo_msg.track_pose_list.poses.append(pose_list[i])
 
+                # track_vel_x_list 和 track_vel_y_list
+                yolo_msg.track_vel_x_list.append(vel_x_list[i])
+                yolo_msg.track_vel_y_list.append(vel_y_list[i])
+        self.yolo_pub.publish(yolo_msg)
+                
         return [image,[[id_list[i],pose_list[i],vel_x_list[i],vel_y_list[i]] for i in range(len(id_list))],frame[3]]
 
     def _set_keyframe(self):

@@ -2,7 +2,7 @@
     <!-- Detection configuration -->
     <arg name="weights" default="$(find yolov5_ros)/weight/yolov5m.pt" />
     <arg name="data" default="$(find yolov5_ros)/src/yolov5/data/coco128.yaml" />
-    <arg name="confidence_threshold" default="0.75" />
+    <arg name="confidence_threshold" default="0.7" />
     <arg name="iou_threshold" default="0.45" />
     <arg name="maximum_detections" default="1000" />
     <arg name="device" default="0" />

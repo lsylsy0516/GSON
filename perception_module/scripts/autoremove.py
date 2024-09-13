@@ -29,7 +29,7 @@ class Detection_Remover:
         # 左右翻转
         # self.origin_map = cv2.flip(self.origin_map, 1)
         # 上下翻转
-        self.origin_map = cv2.flip(self.origin_map, 0) 
+        # self.origin_map = cv2.flip(self.origin_map, 0) 
         # 腐蚀 使得障碍物更大 
 
         # 进行先膨胀后腐蚀,即开运算
@@ -53,7 +53,6 @@ class Detection_Remover:
         '''
         检测结果回调函数
         '''
-        # rospy.loginfo("Get detection")
         if self.map_flag:
             # rospy.loginfo("Get detection")
             pose_array = PoseArray()
@@ -75,17 +74,27 @@ class Detection_Remover:
                 map_pose.position.x = pose.position.x*np.cos(trans_yaw) - pose.position.y*np.sin(trans_yaw) + trans_x
                 map_pose.position.y = pose.position.y*np.cos(trans_yaw) + pose.position.x*np.sin(trans_yaw) + trans_y
 
-                x = int((map_pose.position.x -self.origin_x)/self.resolution)
-                y = int((map_pose.position.y - self.origin_y)/self.resolution)
-                if costmap[x,y] == 0:
+                x = int((map_pose.position.x - self.origin_x)/self.resolution)
+                y = self.costmap.shape[0] - int((map_pose.position.y - self.origin_y)/self.resolution)
+                if x >= costmap.shape[1] or y >= costmap.shape[0] :
+                    continue
+
+
+                if costmap[y,x] < 10 :
                     cv2.circle(costmap,(x,y),6,200,-1)  # 说明这个边缘误识别
-                else:
-                    cv2.circle(costmap,(x,y),10,0,-1)
+                elif costmap[y,x]>100:
+                    cv2.circle(costmap,(x,y),10,100,-1)
                     pose_array.poses.append(pose)
                     cnt += 1
 
-            # rospy.loginfo("Remove %d detections",cnt)
-            costmap = cv2.resize(costmap,(600,600))
+            # x_pred = 10
+            # y_pred = 10
+            # x_img = int((x_pred - self.origin_x)/self.resolution)
+            # y_img = self.costmap.shape[0] - int((y_pred - self.origin_y)/self.resolution)
+            # cv2.circle(costmap,(x_img,y_img),20,128,10)
+
+            # rospy.loginfo("Remove %d detections,total detection %d",cnt,len(msg.poses))
+            # costmap = cv2.resize(costmap,(600,600))
             # cv2.imshow("costmap",costmap)
             # cv2.waitKey(1)
             self.detect_pub.publish(pose_array)

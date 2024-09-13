@@ -10,14 +10,18 @@
     <arg name="input_image_topic" value="/merged_image" />
   </include>
 
-  <!-- <arg name="if_not_debug" default="false" />
+  <arg name="if_not_debug" default="false" />
   <group if="$(arg if_not_debug)">
     <include file="$(find usb_cam)/launch/usb_cam.launch" />
   </group>
 
   <group unless="$(arg if_not_debug)">
     <node name="map_server" pkg="map_server" type="map_server" args="$(find perception_module)/maps/0409_1.yaml" required="true" output="screen" />
-  </group> -->
+  </group>
+
+  <!-- <node name="goal_img_pub" pkg="perception_module" type="goal_image_pub.py" output="screen" /> -->
+
+  <!-- <node name="fisheye_img_pub" pkg="perception_module" type="fisheye_test.py" output="screen" />   -->
 
 
   <!-- <node name="detector" pkg="perception_module" type="detector.py" output="screen" /> -->
