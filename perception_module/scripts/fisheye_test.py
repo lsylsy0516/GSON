@@ -1,4 +1,4 @@
-#!/home/sp/miniconda3/envs/percept/bin/python
+#!/home/orin/miniconda3/envs/yolo/bin/python
 
 import cv2
 import numpy as np
@@ -163,8 +163,8 @@ class ImageMergerNode:
         self.fisheyesticher = FisheyeSticher()
 
         self.merged_image_pub = rospy.Publisher('/merged_image', Image, queue_size=10)
-        self.left_image_sub = rospy.Subscriber('/usb_cam_l/image_raw', Image, self.left_image_callback)
-        self.right_image_sub = rospy.Subscriber('/usb_cam_r/image_raw', Image, self.right_image_callback)
+        self.left_image_sub = rospy.Subscriber('/usb_cam_r/image_raw', Image, self.left_image_callback)
+        self.right_image_sub = rospy.Subscriber('/usb_cam_l/image_raw', Image, self.right_image_callback)
         self.header = Header()
         rospy.loginfo('Image merger node started')
 
@@ -203,7 +203,7 @@ class ImageMergerNode:
             a = cv2.waitKey(1)
             if a  == 115:
                 print("sss")
-                cv2.imwrite("/home/sp/planner_ws/src/perception_module/scripts/goal_image.jpg",merged_image)
+                cv2.imwrite("/home/orin/planner_ws/src/perception_module/scripts/goal_image.jpg",merged_image)
             else:
                 print(a)
     def run(self):

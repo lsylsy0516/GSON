@@ -1,4 +1,4 @@
-#!/home/sp/miniconda3/envs/percept/bin/python
+#!/home/orin/miniconda3/envs/yolo/bin/python
 
 import rospy 
 import cv2
@@ -22,7 +22,8 @@ class Detection_Remover:
         self.buffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.buffer)
 
-        self.map_path = package_path + "/maps/map.pgm"
+        self.map_path = "/home/orin/dashgo_ws/map_1/map.pgm"
+        rospy.loginfo(f"map_path:{self.map_path}")
         self.origin_map = cv2.imread(self.map_path, cv2.IMREAD_GRAYSCALE)
         # 转为2值图
         self.origin_map = cv2.threshold(self.origin_map, 220, 255, cv2.THRESH_BINARY)[1]

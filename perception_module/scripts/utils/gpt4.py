@@ -55,7 +55,7 @@ def match(text):
     
 
 def group(image_path,ground_truth_ids:list):
-	# image_path = "/home/sp/planner_ws/src/perception_module/scripts/utils/saved_image.jpg"
+	# image_path = "/home/orin/planner_ws/src/perception_module/scripts/utils/saved_image.jpg"
 	base64_image = encode_image(image_path)
 	client = OpenAI()
 	start_time = time.time()
@@ -100,7 +100,7 @@ def group(image_path,ground_truth_ids:list):
 	return match(response.choices[0].message.content)
 
 def group_debug(ground_truth_ids:list):
-	image_path = "/home/sp/planner_ws/src/perception_module/keyframes/2024-09-11_213322/3405.jpg"
+	image_path = "/home/orin/planner_ws/src/perception_module/keyframes/2024-09-11_213322/3405.jpg"
 	base64_image = encode_image(image_path)
 	client = OpenAI()
 	start_time = time.time()
@@ -138,7 +138,7 @@ def group_debug(ground_truth_ids:list):
 	return match(response.choices[0].message.content)
 		
 def handle(image,ground_truth_ids):
-    filename = "/home/sp/planner_ws/src/perception_module/keyframes/2024-09-11_213322/3405.jpg"  
+    filename = "/home/orin/planner_ws/src/perception_module/keyframes/2024-09-11_213322/3405.jpg"  
     cv2.imwrite(filename, image)
     return group(filename,ground_truth_ids)
 	
@@ -147,8 +147,8 @@ def handle(image,ground_truth_ids):
 if __name__ == '__main__':
 	try:
 		# path = input("Please input the image path:")
-		path = "/home/sp/planner_ws/src/perception_module/keyframes/2024-09-11_215924/846.jpg"
-		# path = "/home/sp/planner_ws/src/perception_module/keyframes/2024-09-07_182135445.jpg"  
+		path = "/home/orin/planner_ws/src/perception_module/keyframes/2024-09-11_215924/846.jpg"
+		# path = "/home/orin/planner_ws/src/perception_module/keyframes/2024-09-07_182135445.jpg"  
 		image = cv2.imread(path)
 		if image is None:
 			raise Exception("Image not found")

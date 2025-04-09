@@ -1,4 +1,4 @@
-#!/home/sp/miniconda3/envs/percept/bin/python
+#!/home/orin/miniconda3/envs/yolo/bin/python
 import rospy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge

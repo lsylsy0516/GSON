@@ -1,4 +1,4 @@
-#!/home/sp/miniconda3/envs/percept/bin/python3
+#!/home/orin/miniconda3/envs/yolo/bin/python3
 '''
     This is the track module for perception 
     维护一个tracker类，用于追踪动态障碍物
@@ -97,7 +97,7 @@ class Tracker_Module:
             local_x = msg.poses[i].position.x
             local_y = msg.poses[i].position.y 
 
-            if local_x**2 + local_y**2 > 81:# 如果距离大于8m,则不追踪
+            if local_x**2 + local_y**2 > 144:# 如果距离大于8m,则不追踪
                 continue
 
 

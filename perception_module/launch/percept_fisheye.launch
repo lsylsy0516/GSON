@@ -1,0 +1,12 @@
+<launch>
+
+  <include file="$(find dr_spaam_ros)/launch/dr_spaam_ros.launch"/>
+  
+  <node name="goal_img_pub" pkg="perception_module" type="goal_image_pub.py" output="screen" />
+
+  <node name="fisheye_img_pub" pkg="perception_module" type="fisheye_test.py" output="screen" />  
+
+  <!-- add rviz -->
+  <node name="percept_rviz" pkg="rviz" type="rviz" args="-d $(find perception_module)/rviz/2.rviz" required="true" output="screen" />
+
+</launch>

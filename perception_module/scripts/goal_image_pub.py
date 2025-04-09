@@ -1,4 +1,4 @@
-#!/home/sp/miniconda3/envs/percept/bin/python
+#!/home/orin/miniconda3/envs/yolo/bin/python
 
 
 import rospy
@@ -18,7 +18,7 @@ def publish_image():
     bridge = CvBridge()
     
     # 读取图像
-    image_path = '/home/sp/planner_ws/src/perception_module/scripts/goal_image.jpg'
+    image_path = '/home/orin/planner_ws/src/perception_module/scripts/goal_image.jpg'
     cv_image = cv2.imread(image_path)
     
     if cv_image is None:

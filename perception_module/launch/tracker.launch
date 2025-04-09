@@ -4,8 +4,6 @@
 
 <node name="remove_node" pkg="perception_module" type="autoremove.py" output="screen" />
 
-<node name="mapping_node" pkg="perception_module" type="mapping_module.py" output="screen" />
-
-<node name="detector_node" pkg="perception_module" type="detector.py" output="screen" />
+<include file="$(find dr_spaam_ros)/launch/dr_spaam_ros.launch"/>
 
 </launch>
