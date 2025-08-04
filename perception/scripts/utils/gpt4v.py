@@ -211,7 +211,7 @@ def handle(image,ground_truth_ids):
 if __name__ == '__main__':
 	try:
 		# path = input("Please input the image path:")
-		path = "/home/orin/planner_ws/src/perception_module/keyframes/2025-03-17_220314/0.jpg"
+		path = "/home/orin/planner_ws/src/perception/keyframes/2025-03-17_220314/0.jpg"
 		image = cv2.imread(path)
 		if image is None:
 			raise Exception("Image not found")

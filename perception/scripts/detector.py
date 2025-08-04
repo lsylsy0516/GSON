@@ -26,7 +26,7 @@ from trigger import Trigger
 
 import rospkg
 rospack = rospkg.RosPack()
-package_path = rospack.get_path('perception_module')
+package_path = rospack.get_path('perception')
 
 cnt = 0
 

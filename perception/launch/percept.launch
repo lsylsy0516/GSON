@@ -1,7 +1,7 @@
 <launch>
   <include file="$(find dr_spaam_ros)/launch/dr_spaam_ros.launch"/>
 
-  <node name="join_pic" pkg="perception_module" type="join_pic.py" output="screen" />
+  <node name="join_pic" pkg="perception" type="join_pic.py" output="screen" />
 
   <!-- <include file="$(find yolov5_ros)/launch/yolov5.launch">
     <arg name="line_thickness" value="1" />
@@ -15,17 +15,17 @@
   </group>
   
    <!-- <group unless="$(arg if_not_debug)">
-    <node name="map_server" pkg="map_server" type="map_server" args="$(find perception_module)/maps/0409_1.yaml" required="true" output="screen" />
+    <node name="map_server" pkg="map_server" type="map_server" args="$(find perception)/maps/0409_1.yaml" required="true" output="screen" />
   </group> -->
 
 <!--   
-    <node name="goal_img_pub" pkg="perception_module" type="goal_image_pub.py" output="screen" />
+    <node name="goal_img_pub" pkg="perception" type="goal_image_pub.py" output="screen" />
 
-  <node name="fisheye_img_pub" pkg="perception_module" type="fisheye_test.py" output="screen" />   -->
+  <node name="fisheye_img_pub" pkg="perception" type="fisheye_test.py" output="screen" />   -->
 
 
   <!-- add rviz -->
-  <!-- <node name="percept_rviz" pkg="rviz" type="rviz" args="-d $(find perception_module)/rviz/2.rviz" required="true" output="screen" /> -->
+  <!-- <node name="percept_rviz" pkg="rviz" type="rviz" args="-d $(find perception)/rviz/2.rviz" required="true" output="screen" /> -->
 
 
 </launch>

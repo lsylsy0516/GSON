@@ -21,7 +21,7 @@ from visualization_msgs.msg import MarkerArray,Marker
 
 import rospkg
 rospack = rospkg.RosPack()
-package_path = rospack.get_path('perception_module')
+package_path = rospack.get_path('perception')
 
 
 class Tracker_Module:

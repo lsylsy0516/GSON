@@ -1,7 +1,7 @@
 <launch>
 
-    <include file="$(find perception_module)/launch/percept.launch"/>
-    <include file="$(find perception_module)/launch/detector.launch"/>
+    <include file="$(find perception)/launch/percept.launch"/>
+    <include file="$(find perception)/launch/detector.launch"/>
     <!-- <include file="$(find ourplanner)/launch/new_planner.launch"/> -->
     <!-- <node pkg="rosbag" type="record" name="rosbag_record" output="screen" args="-a "/> -->
 

@@ -11,7 +11,7 @@ import tf2_ros
 
 import rospkg
 rospack = rospkg.RosPack()
-package_path = rospack.get_path('perception_module')
+package_path = rospack.get_path('perception')
 
 class Detection_Remover:
     def __init__(self) -> None:

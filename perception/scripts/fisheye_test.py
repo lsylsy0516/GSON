@@ -203,7 +203,7 @@ class ImageMergerNode:
             a = cv2.waitKey(1)
             if a  == 115:
                 print("sss")
-                cv2.imwrite("/home/orin/planner_ws/src/perception_module/scripts/goal_image.jpg",merged_image)
+                cv2.imwrite("/home/orin/planner_ws/src/perception/scripts/goal_image.jpg",merged_image)
             else:
                 print(a)
     def run(self):

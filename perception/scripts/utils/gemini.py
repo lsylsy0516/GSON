@@ -136,7 +136,7 @@ def handle(image,ground_truth_ids):
 
 if __name__ == '__main__':  
     try:
-        path = "/home/orin/planner_ws/src/perception_module/keyframes/2025-03-11_164545/2.jpg"
+        path = "/home/orin/planner_ws/src/perception/keyframes/2025-03-11_164545/2.jpg"
         print(path)
         image = cv2.imread(path)
         if image is None:
