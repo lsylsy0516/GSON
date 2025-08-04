@@ -1,0 +1,3 @@
+[submodule "planner"]
+	path = planner
+	url = https://github.com/MrCasual1215/GSON_Planner

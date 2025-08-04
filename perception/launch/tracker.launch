@@ -1,0 +1,24 @@
+<launch>
+
+  <!-- <param name="use_sim_time" value="true"/> -->
+
+  <!-- 播放 rosbag，并发布 /clock 时间 -->
+  <!-- <node name="rosbag_play" pkg="rosbag" type="play"
+        args="/media/orin/Backup/shit.bag "
+        output="screen" /> -->
+<arg name="if_not_debug" default="true" />
+<group if="$(arg if_not_debug)">
+    <include file="$(find usb_cam)/launch/usb_cam.launch" />
+</group>
+
+<node name="join_pic" pkg="perception_module" type="join_pic.py" output="screen" />
+
+<node name="track_node" pkg="perception_module" type="track_module.py" output="screen" />
+
+<node name="remove_node" pkg="perception_module" type="autoremove.py" output="screen" />
+
+<!-- <node name="mapping_node" pkg="perception_module" type="mapping_module.py" output="screen" /> -->
+
+<include file="$(find dr_spaam_ros)/launch/dr_spaam_ros.launch"/>
+
+</launch>
