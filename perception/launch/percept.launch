@@ -1,31 +1,29 @@
+<?xml version="1.0"?>
 <launch>
+
+  <!-- load rosparam here -->
+  <rosparam command="load" file="$(find perception)/config/perception_config.yaml" />
+  
+  <!-- declare arguments -->
+  <arg name="enable_join_pic" default="true" />
+  <arg name="input_image_topic" default="/merged_image" />
+
+  <!-- optional join_pic node -->
+  <group if="$(arg enable_join_pic)">
+    <node name="join_pic" pkg="perception" type="join_pic.py" output="screen" />
+  </group>
+
+  <!-- 2D Lidar Pedestrian Detection -->
   <include file="$(find dr_spaam_ros)/launch/dr_spaam_ros.launch"/>
 
-  <node name="join_pic" pkg="perception" type="join_pic.py" output="screen" />
-
-  <!-- <include file="$(find yolov5_ros)/launch/yolov5.launch">
+  <!-- YOLOv5 Pedestrian Detection -->
+  <include file="$(find yolov5_ros)/launch/yolov5.launch">
     <arg name="line_thickness" value="1" />
     <arg name="publish_image" value="true" />
-    <arg name="input_image_topic" value="/merged_image" />
-  </include> -->
+    <arg name="input_image_topic" value="$(arg input_image_topic)" />
+  </include>
 
-  <arg name="if_not_debug" default="true" />
-  <group if="$(arg if_not_debug)">
-    <include file="$(find usb_cam)/launch/usb_cam.launch" />
-  </group>
-  
-   <!-- <group unless="$(arg if_not_debug)">
-    <node name="map_server" pkg="map_server" type="map_server" args="$(find perception)/maps/0409_1.yaml" required="true" output="screen" />
-  </group> -->
-
-<!--   
-    <node name="goal_img_pub" pkg="perception" type="goal_image_pub.py" output="screen" />
-
-  <node name="fisheye_img_pub" pkg="perception" type="fisheye_test.py" output="screen" />   -->
-
-
-  <!-- add rviz -->
-  <!-- <node name="percept_rviz" pkg="rviz" type="rviz" args="-d $(find perception)/rviz/2.rviz" required="true" output="screen" /> -->
-
+  <!-- rviz visualization -->
+  <node name="percept_rviz" pkg="rviz" type="rviz" args="-d $(find perception)/rviz/2.rviz" required="true" output="screen" />
 
 </launch>

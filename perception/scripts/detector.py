@@ -1,363 +1,213 @@
-#!/home/orin/miniconda3/envs/yolo/bin/python
+#!/home/luo/miniconda3/envs/gson/bin/python3
 
-from utils.gpt4v import group as gemini_group   # gpt4o
-from visualization_msgs.msg import Marker, MarkerArray
-import tf.transformations as tf_trans
-from sensor_msgs.msg import Image, CameraInfo
-from geometry_msgs.msg import PoseArray,PoseStamped,Pose
-from detection_msgs.msg import BoundingBoxes,BoundingBox,mapping,Group,Groups,tracks
-from cv_bridge import CvBridge, CvBridgeError
-from collections import deque
-from datetime import datetime
+# -*- coding: utf-8 -*-
+# Modified by: Shangyi Luo (lsylsy030516@gmail.com)
+# Original project: GSON - Group-based Social Navigation Framework
+# License: GNU General Public License v3.0 (see LICENSE file)
+
+import cv2
+import rospy
+import rospkg
 import message_filters
 
-import threading
-import time
-import rospy
-import tf2_ros
-import cv2
-import os
-import numpy as np
-import tf
-import json
-from detection_msgs.msg import mapping
-from std_msgs.msg import String,Bool
-from trigger import Trigger
+from collections import deque
+from cv_bridge import CvBridge
 
-import rospkg
-rospack = rospkg.RosPack()
-package_path = rospack.get_path('perception')
+from sensor_msgs.msg import Image
+from detection_msgs.msg import BoundingBoxes, BoundingBox, mapping, tracks
 
-cnt = 0
+from filter import ConnectionTracker, KeyframeSaver, Mapping_frame, GroupTracker
 
-class DataQueue:
-    def __init__(self,maxlen) -> None:
-        self.datas = deque(maxlen=maxlen)
-        self.times = deque(maxlen=maxlen) 
 
-class Mapping_frame:
-    def __init__ (self,msg:mapping):
-        self.stamp = msg.header.stamp
-        self.id_list = []
-        self.points = []
-        self.pose_array = []
-        self.vel_x_list = []
-        self.vel_y_list = []
+class DetectorContinuous:
 
-        self.points = [[msg.point_xs[i],msg.point_ys[i]] for i in range(len(msg.id_list))]
-        self.pose_array = [msg.pose_list.poses[i] for i in range(len(msg.id_list))]
-        self.id_list = [msg.id_list[i] for i in range(len(msg.id_list))]
-        self.vel_x_list = [msg.vel_x_list[i] for i in range(len(msg.id_list))]
-        self.vel_y_list = [msg.vel_y_list[i] for i in range(len(msg.id_list))]
+    """
+    Synchronizes image, detection, and mapping information, 
+    and processes frames to associate detected objects with mapped points.
+    """
 
-    def add(self,frame:"Mapping_frame"):
-        self.id_list.extend(frame.id_list)
-        self.points.extend(frame.points)
-        self.pose_array.extend(frame.pose_array)
-        self.vel_x_list.extend(frame.vel_x_list)
-        self.vel_y_list.extend(frame.vel_y_list)
+    def __init__(self):
         
+        # Initialize group tracker modules
+        # pub Groups msg , and do not pub grouped image
+        pkg_path = rospkg.RosPack().get_path('perception')
+        
+        self.connection_tracker = ConnectionTracker(if_pub=True)    
+        
+        self.keyframe_saver = KeyframeSaver(
+            self.connection_tracker,
+            if_publish = False,
+            if_node    = False,
+            save_dir   = pkg_path + "/keyframes/"
+        )
+        self.node = GroupTracker(
+            self.connection_tracker,
+            keyframe_dir= pkg_path + "/keyframes",
+            save_dir    = pkg_path + "/keyframes/filter_res"
+        )
 
-class Detector_Config:
-        # 保留detector的配置信息以及一些全局变量
-    def __init__(self, config_path):
-        with open(config_path, 'r') as f:
-            self.config = json.load(f)
-
-        self.folder_path = package_path+ self.config["folder_path"] + datetime.now().strftime("%Y-%m-%d_%H%M%S")+"/"
-
-        self.frames = deque(maxlen=self.config["frame_lenth"])
-
-        self.bounding_boxes_frames = DataQueue(self.config["keep_time"])
-        self.image_frames = DataQueue(self.config["keep_time"])
-        self.mapping_frames = DataQueue(self.config["keep_time"])
-
-        self.id_already_met = []
-        self.frame = []
-        self.cur_frame = []
-        self.keyframe = []
-        self.group_list = []
-        self.keyframe_count = 0
-
-class Detector_SubModule:
-    def __init__(self) -> None:
+        # Initialize tool instances
         self.bridge = CvBridge()
-        self.trigger = Trigger()
-        self.listener = tf.TransformListener()
-        self.rate = rospy.Rate(10)
+        self.image_bbox_buffer = deque(maxlen=10)
 
-class Detector:
-    def __init__(self) -> None:
-
-        # 初始化配置
-        config_path = package_path + "/config/detector_config.json"
-        self.config_module = Detector_Config(config_path)
-
-        # 其他初始化代码
-        self.submodule = Detector_SubModule()
-
-        # 初始化订阅者和发布者
-        self._initialize_Sub_Pub()
-
-        # 线程初始化
-        self._initialize_threads()
-
-        # 创建文件夹
-        os.mkdir(self.config_module.folder_path)
-
-        rospy.loginfo("Detector node start")
-
-    def _initialize_Sub_Pub(self):
-        # the only publisher we need
-        self.group_pub = rospy.Publisher("group", Groups, queue_size=1)
-        self.stop_flag_pub = rospy.Publisher("/stop_flag",Bool,queue_size=1)
-        self.yolo_pub = rospy.Publisher("yolo/tracks",tracks,queue_size=1)
+        # Initialize ROS subscribers 
+        self._initialize_subscribers()
         
-        self.left_map_sub = message_filters.Subscriber("/mapping/left", mapping)
-        self.right_map_sub = message_filters.Subscriber("/mapping/right", mapping)
-        ts = message_filters.TimeSynchronizer([self.left_map_sub,self.right_map_sub], 10)
-        ts.registerCallback(self._mapping_cb)
+        rospy.loginfo("DetectorContinuous Node Initialized Successfully")
 
-        imageage_sub = message_filters.Subscriber(self.config_module.config["image_topic"], Image)
-        self.bounding_boxes_sub = message_filters.Subscriber(self.config_module.config["BoundingBoxes_topic"], BoundingBoxes)
-        ts2 = message_filters.TimeSynchronizer([imageage_sub,self.bounding_boxes_sub], 10)
-        ts2.registerCallback(self._bounding_boxes_cb)
+    def _initialize_subscribers(self):
 
-    def _initialize_threads(self):
-        pass
-        # 初始化处理线程
+        # Subscribe to tracker updates
+        rospy.Subscriber("/tracker", tracks, self.connection_tracker.tracker_callback)
 
-        thread_get_group = threading.Thread(target=self._get_group)
-        thread_get_group.daemon = True
-        thread_get_group.start()
+        # Subscribe to image and bbox detection topics
+        image_sub = message_filters.Subscriber("/yolov5/image_out", Image)
+        bbox_sub = message_filters.Subscriber("/yolov5/detections", BoundingBoxes)
+        self.image_bbox_sync = message_filters.ApproximateTimeSynchronizer(
+            [image_sub, bbox_sub], queue_size=10, slop=0.05
+        )
+        self.image_bbox_sync.registerCallback(self.image_bbox_callback)
 
-    def gpt_flag_cb(self,msg:Bool):
-        if msg.data == True: 
-            cur_frame = self.config_module.cur_frame.copy()
-            self._pub_group(cur_frame)
-            return
-        else:
-            return
-
-    def _get_group(self):
-        while not rospy.is_shutdown():
-            try:
-                self.run()
-            except Exception as e:
-                rospy.logerr(f"error when get group:{e}")
-                # raise RuntimeError(f"error when get group:{e}")
-
-    def _pub_group(self,keyframe:list):
-        try:
-            global cnt
-            image_path = self.config_module.folder_path+f"{cnt}" +".jpg"
-            cnt +=1
-            cv2.imwrite(image_path,keyframe[0])
-            rospy.loginfo(f"save keyframe: {image_path}")
-            id_list = [id for [id,_,_,_] in keyframe[1]]
-            id_list = list(dict.fromkeys(id_list))
-            # while self.config_module.group_list == []:
-                # self.config_module.group_list = gemini_group(image_path,id_list)
-            
-            input_list = input("please input group_list:\n")
-            parts = input_list.split(',')
-
-            # 对每个部分按空格分隔，并将字符串转换为整数
-            result = [[int(num) for num in part.split()] for part in parts]
-
-            print(result)
-            time.sleep(5)
-            self.config_module.group_list = result
-            
-            rospy.loginfo(f"Get group_list:{self.config_module.group_list}")
-            rospy.loginfo("Publish group")
-            groups_msg = Groups()
-            groups_msg.header.stamp = keyframe[2]
-            groups_msg.header.stamp = rospy.Time.now()
-            groups_msg.header.frame_id = "map"
-
-            for group in self.config_module.group_list:
-                group_msg  = Group()
-                count = 0
-                for [id,pose,vel_x,vel_y] in keyframe[1]:
-                    if id in group_msg.group_id_list:
-                        rospy.loginfo("id in group")
-                        continue
-                    if id in group:
-                        p = Pose()
-                        p.position.x = pose.position.x
-                        p.position.y = pose.position.y
-                        group_msg.group_pose_list.poses.append(p)
-                        group_msg.group_id_list.append(id)
-                        group_msg.group_vel_x_list.append(vel_x)
-                        group_msg.group_vel_y_list.append(vel_y)
-                        count += 1
-                groups_msg.group_list.append(group_msg)
-            if len(groups_msg.group_list) == 0:
-                rospy.loginfo("No group")
-            self.submodule.trigger.group_callback(groups_msg)
-            self.group_pub.publish(groups_msg)
-            # 变换重置
-            self.config_module.group_list = []
-
-        except Exception as e:
-            rospy.logwarn(f"error when publishing: {e}")
-
-    def _mapping_cb(self,left_map_msg:mapping,right_map_msg:mapping):
-        left_map = Mapping_frame(left_map_msg)
-        right_map = Mapping_frame(right_map_msg)
-        left_map.add(right_map)
-
-        # rospy.loginfo(left_map.id_list)
-        
-        self.config_module.mapping_frames.datas.append(left_map)
-        self.config_module.mapping_frames.times.append(left_map_msg.header.stamp)
-
-    def _bounding_boxes_cb(self,image:Image,msg:BoundingBoxes):
-        self.config_module.bounding_boxes_frames.datas.append(msg.bounding_boxes)
-        self.config_module.bounding_boxes_frames.times.append(msg.header.stamp)
-        try:
-            cv_image = self.submodule.bridge.imgmsg_to_cv2(image, "bgr8")
-            self.config_module.image_frames.datas.append(cv_image)
-            self.config_module.image_frames.times.append(msg.header.stamp)
-            # cv2.imshow("image",cv_image)
-            # cv2.waitKey(10)
-            # print(cv_image.shape)
-        except CvBridgeError as e:
-            rospy.logwarn(f"error when bbox_cb:{e}")
-
-    def _set_frame(self):
-        if len(self.config_module.bounding_boxes_frames.datas) == 0 :
-            # rospy.loginfo("no bbox")
-            return  False
-        if len(self.config_module.mapping_frames.datas)== 0:
-            # rospy.loginfo("no mapping frame")
-            return  False
-        else:
-            # rospy.loginfo("setting frame")
-            boundingboxes_frame = self.config_module.bounding_boxes_frames.datas[-1]
-            image_frame = self.config_module.image_frames.datas[-1]
-            boundingboxes_time = self.config_module.bounding_boxes_frames.times[-1]
-            mapping_frame = None
-            mapping_frame_time = None
-            for i in range(len(self.config_module.mapping_frames.datas)):
-                if mapping_frame == None or abs(self.config_module.mapping_frames.times[i] - boundingboxes_time) < abs(mapping_frame_time - boundingboxes_time):
-                    mapping_frame = self.config_module.mapping_frames.datas[i]
-                    mapping_frame_time = self.config_module.mapping_frames.times[i]
-            # mapping_frame 包括id_list,points,pose_array
-            self.config_module.frame = [image_frame,boundingboxes_frame,mapping_frame,boundingboxes_time]
-            a = self.auto_remove(self.config_module.frame)
-            self.config_module.cur_frame = a[0]
-            self.config_module.frames.append(self.config_module.cur_frame)
-            cv2.imshow("image",self.config_module.cur_frame[0])
-            cv2.waitKey(100)
-            
-            yolo_msg = a[1]
-            if yolo_msg == []:
-                pass
-            else:#
-                self.yolo_pub.publish(yolo_msg)
-                res = self.submodule.trigger.tracker_callback(yolo_msg)
-                self.gpt_flag_cb(res)
-            return True
-    
-    def auto_remove(self,frame): # list[Image,BoundingBoxes,Mapping_frame]
-        image = frame[0]
-        boundingboxes = frame[1]
-        mapping_frame = frame[2] # Mapping_frame
-        id_list = []
-        pose_list = []
-        vel_x_list = []
-        vel_y_list = []
-
-        flag = 0
-        for boundingbox in boundingboxes:
-            if boundingbox.ymax-boundingbox.ymin < 0:
-                continue
-            else:
-                flag = 1
-        if flag == 0:
-            return [image,[],frame[3]]  
-        for boundingbox in boundingboxes:
-            boundingbox:BoundingBox
-            if boundingbox.Class != "person":
-                continue
-            # if abs(boundingbox.xmax - 640) < 10 or  abs(boundingbox.xmin - 640) < 10 or abs(boundingbox.xmax - 1280) < 10 or abs(boundingbox.xmin - 0) < 10:
-            #     continue
-            # if abs(boundingbox.xmax - 640) < 10 or  abs(boundingbox.xmin - 640) < 10 or abs(boundingbox.xmax - 1280) < 10 or abs(boundingbox.xmin - 0) < 10:
-            #     continue
-            boundingbox_index = -1
-            for i in range(len(mapping_frame.id_list)):
-                thre = 0.15
-                x_thre = (boundingbox.xmax - boundingbox.xmin) * thre
-                if boundingbox.xmin <= (mapping_frame.points[i][0] - x_thre) and (mapping_frame.points[i][0]<= boundingbox.xmax+x_thre) and boundingbox.ymin <= mapping_frame.points[i][1] and mapping_frame.points[i][1] <= boundingbox.ymax:             
-                    # cv2.circle(image,(int(mapping_frame.points[i][0]),int(mapping_frame.points[i][1])),3,(0,255,0),-1)
-                    # cv2.putText(image,str(mapping_frame.id_list[i]),(int(mapping_frame.points[i][0]),int(mapping_frame.points[i][1])),cv2.FONT_HERSHEY_SIMPLEX,1,(0,255,0),2)
-
-                    if boundingbox_index == -1 or mapping_frame.points[i][1] <= mapping_frame.points[boundingbox_index][1]:
-                        boundingbox_index = i
-            if boundingbox_index == -1:
-                continue
-
-            boundingbox_id = mapping_frame.id_list[boundingbox_index]
-            id_list.append(boundingbox_id)
-            pose_list.append(mapping_frame.pose_array[boundingbox_index])
-            vel_x_list.append(mapping_frame.vel_x_list[boundingbox_index])
-            vel_y_list.append(mapping_frame.vel_y_list[boundingbox_index])
-
-            label = str(boundingbox_id)
-            w, h = cv2.getTextSize(label, 0, fontScale=1, thickness=1)[0]  # text width, height
-            p1, p2 = (int(boundingbox.xmin), int(boundingbox.ymin)), (int(boundingbox.xmax), int(boundingbox.ymax)) 
-            center_x = p1[0] + (p2[0] - p1[0]) // 2  # 边界框的中心x位置
-            p1 = (center_x - w // 2, p1[1] + h)  # 调整标签位置，居中对齐
-            if p1[0] < 0:  # 防止标签超出左边界
-                p1 = (0, p1[1])
-            if p1[0] + w > image.shape[1]:  # 防止标签超出右边界
-                p1 = (image.shape[1] - w, p1[1])
-            p2 = p1[0] + w, p1[1] -2* h 
-            if p2[1] > 0:
-                p1 = (p1[0], p1[1] - h)
-                cv2.rectangle(image, p1, p2, [255,0,0], -1, cv2.LINE_AA)  # filled
-            else:
-                p2 = p1[0] + w, p1[1] 
-                p1 = (p1[0], p1[1])
-                cv2.rectangle(image, (p1[0], p1[1] - h), p2, [255,0,0], -1, cv2.LINE_AA)  # filled
-        
-            cv2.putText(
-                image,
-                label,
-                p1,  # 根据新的位置调整文本
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (255, 255, 255),
-                thickness=2,
-                lineType=cv2.LINE_AA,
+        # Subscribe to left/right 2D mapping topics (support single map source if needed)
+        if rospy.get_param("~single_camera", False):
+            left_map_sub = message_filters.Subscriber("/mapping/left", mapping)
+            self.map_sync = message_filters.ApproximateTimeSynchronizer(
+                [left_map_sub], queue_size=10, slop=0.05
             )
-        
-        yolo_msg = tracks() # list , msg
-        id_list = list(set(id_list))
-        for i in range(len(id_list)):
-            # track_id_list
-            yolo_msg.track_id_list.append(id_list[i])
-            
-            # track_pose_list
-            yolo_msg.track_pose_list.poses.append(pose_list[i])
+            self.map_sync.registerCallback(self.mapping_callback_single)
+        else:
+            left_map_sub = message_filters.Subscriber("/mapping/left", mapping)
+            right_map_sub = message_filters.Subscriber("/mapping/right", mapping)
+            self.map_sync = message_filters.ApproximateTimeSynchronizer(
+                [left_map_sub, right_map_sub], queue_size=10, slop=0.05
+            )
+            self.map_sync.registerCallback(self.mapping_callback)
 
-            # track_vel_x_list 和 track_vel_y_list
-            yolo_msg.track_vel_x_list.append(vel_x_list[i])
-            yolo_msg.track_vel_y_list.append(vel_y_list[i])
+    def image_bbox_callback(self, image_msg, bbox_msg):
+        """Callback for image + bbox, caches latest synchronized inputs."""
+        timestamp = image_msg.header.stamp.to_sec()
+        self.image_bbox_buffer.append((timestamp, image_msg, bbox_msg))
 
-        return [image,[[id_list[i],pose_list[i],vel_x_list[i],vel_y_list[i]] for i in range(len(id_list))],frame[3]] , yolo_msg
-        
-    def run(self):
-        self._set_frame()
-        # pass
-        
+    def mapping_callback(self, left_map_msg, right_map_msg):
+        """Synchronizes mapping data with cached image/bbox data."""
+        if not self.image_bbox_buffer:
+            rospy.logwarn("Image/bbox buffer is empty.")
+            return
+
+        map_time = left_map_msg.header.stamp.to_sec()
+        best_pair = min(
+            self.image_bbox_buffer,
+            key=lambda x: abs(x[0] - map_time)
+        )
+        _, image_msg, bbox_msg = best_pair
+
+        curr_map = Mapping_frame(left_map_msg).merge(Mapping_frame(right_map_msg))
+        self.process_frame(curr_map, image_msg, bbox_msg)
+
+    def mapping_callback_single(self, map_msg):
+        if not self.image_bbox_buffer:
+            rospy.logwarn("Image/bbox buffer is empty.")
+            return
+
+        map_time = map_msg.header.stamp.to_sec()
+        best_pair = min(
+            self.image_bbox_buffer,
+            key=lambda x: abs(x[0] - map_time)
+        )
+        _, image_msg, bbox_msg = best_pair
+
+        curr_map = Mapping_frame(map_msg)
+        self.process_frame(curr_map, image_msg, bbox_msg)
+
+    def process_frame(self, curr_map, image_msg, bbox_msg):
+        rospy.loginfo("Processing synchronized frame...")
+
+        if not bbox_msg.bounding_boxes:
+            self.keyframe_saver.synced_callback(image_msg, None)
+            rospy.logwarn("No bounding boxes detected. Keyframe saved without annotations.")
+            return
+
+        image = self.bridge.imgmsg_to_cv2(image_msg, "bgr8")
+
+        mapped_id_list, mapped_pose_list = [], []
+        mapped_vel_x_list, mapped_vel_y_list = [], []
+
+        # Associate detections with mapped points
+        for bbox in bbox_msg.bounding_boxes:
+            if bbox.Class != "person":
+                continue
+
+            matched_index = -1
+            for i in range(len(curr_map.id_list)):
+                x_thre = (bbox.xmax - bbox.xmin)
+                if bbox.xmin <= curr_map.points[i][0] + x_thre and \
+                   bbox.xmax >= curr_map.points[i][0] - x_thre and \
+                   bbox.ymin <= curr_map.points[i][1] and \
+                   bbox.ymax >= curr_map.points[i][1]:
+
+                    # Optional Draw match
+                    # cv2.circle(image, tuple(map(int, curr_map.points[i])), 5, (0, 255, 0), -1)
+                    # cv2.putText(
+                    #     image, str(curr_map.id_list[i]),
+                    #     (int(curr_map.points[i][0]), int(curr_map.points[i][1] - 10)),
+                    #     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1
+                    # )
+                    
+                    # for dashgo system,we prefer to choose the one with the largest x coordinate
+                    if matched_index == -1 or curr_map.points[i][0] > curr_map.points[matched_index][0]:    
+                        matched_index = i
+
+            if matched_index == -1:
+                continue
+
+            mapped_id_list.append(curr_map.id_list[matched_index])
+            mapped_pose_list.append(curr_map.points[matched_index])
+            mapped_vel_x_list.append(curr_map.vel_x_list[matched_index])
+            mapped_vel_y_list.append(curr_map.vel_y_list[matched_index])
+            image = self.draw_label(image, bbox, str(curr_map.id_list[matched_index]))
+
+        # Compose new image and bbox message for keyframe
+        mapped_img_msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
+        mapped_bbox_msg = BoundingBoxes()
+
+        for i in range(len(mapped_id_list)):
+            bbox = BoundingBox()
+            bbox.Class = str(mapped_id_list[i])
+            bbox.xmin = bbox_msg.bounding_boxes[i].xmin
+            bbox.xmax = bbox_msg.bounding_boxes[i].xmax
+            bbox.ymin = bbox_msg.bounding_boxes[i].ymin
+            bbox.ymax = bbox_msg.bounding_boxes[i].ymax
+            mapped_bbox_msg.bounding_boxes.append(bbox)
+
+        self.keyframe_saver.synced_callback(mapped_img_msg, mapped_bbox_msg)
+
+    def draw_label(self, image, bbox, text, scale_factor=0.5):
+        """Draws bounding box and label text on image."""
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1.5 * scale_factor
+        thickness = int(2 * scale_factor)
+        box_thickness = int(2 * scale_factor)
+
+        x1, y1, x2, y2 = bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax
+        cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), box_thickness)
+
+        (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+        text_x = x1 + (x2 - x1 - text_width) // 2
+        text_y = y1 - int(10 * scale_factor) - text_height
+
+        if text_y < 0:
+            rect_y1 = y1 + int(10 * scale_factor)
+            rect_y2 = rect_y1 + text_height + baseline
+            cv2.rectangle(image, (text_x, rect_y1), (text_x + text_width, rect_y2), (255, 0, 0), -1)
+            cv2.putText(image, text, (text_x, rect_y2 - baseline), font, font_scale, (255, 255, 255), thickness)
+        else:
+            cv2.rectangle(image, (text_x, text_y), (text_x + text_width, y1), (255, 0, 0), -1)
+            cv2.putText(image, text, (text_x, y1 - int(5 * scale_factor)), font, font_scale, (255, 255, 255), thickness)
+
+        return image
+
+
 if __name__ == '__main__':
-    time.sleep(10)
-    rospy.init_node('detector', anonymous=True)
-    detector = Detector()
-    rate = rospy.Rate(10)
-    while not rospy.is_shutdown():
-        rate.sleep()
+    rospy.init_node('detector_continuous', anonymous=True)
+    detector = DetectorContinuous()
     rospy.spin()

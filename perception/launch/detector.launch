@@ -1,11 +1,12 @@
+<?xml version="1.0"?>
 <launch>
 
-<node name="track_node" pkg="perception" type="track_module.py" output="screen" />
+    <node name="track_node"    pkg="perception" type="track.py"      output="screen" />
 
-<node name="remove_node" pkg="perception" type="autoremove.py" output="screen" />
+    <node name="remove_node"   pkg="perception" type="autoremove.py" output="screen" />
 
-<!-- <node name="mapping_node" pkg="perception" type="mapping_module.py" output="screen" /> -->
+    <node name="mapping_node"  pkg="perception" type="mapping.py"    output="screen" />
 
-<!-- <node name="detector_node" pkg="perception" type="detector.py" output="screen" /> -->
+    <node name="detector_node" pkg="perception" type="detector.py"   output="screen" />
 
 </launch>

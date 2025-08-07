@@ -1,4 +1,4 @@
-#!/home/orin/miniconda3/envs/percept/bin/python
+#!/home/luo/miniconda3/envs/gson/bin/python3
 import rospy
 from dr_spaam_ros.dr_spaam_ros import DrSpaamROS
 

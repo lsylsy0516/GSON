@@ -1,8 +1,19 @@
+<?xml version="1.0"?>
 <launch>
 
-    <include file="$(find perception)/launch/percept.launch"/>
-    <include file="$(find perception)/launch/detector.launch"/>
-    <!-- <include file="$(find ourplanner)/launch/new_planner.launch"/> -->
-    <!-- <node pkg="rosbag" type="record" name="rosbag_record" output="screen" args="-a "/> -->
+  <!-- perception setup: configure enable_join_pic and input_image_topic -->
+  <include file="$(find perception)/launch/percept.launch">
+    <arg name="enable_join_pic" value="true" />
+    <arg name="input_image_topic" value="/merged_image" />
+  </include>
+
+  <!-- tracking and mapping -->
+  <include file="$(find perception)/launch/detector.launch"/>
+
+  <!-- planner -->
+  <!-- <include file="$(find ourplanner)/launch/new_planner.launch"/> -->
+
+  <!-- optional rosbag recording -->
+  <!-- <node pkg="rosbag" type="record" name="rosbag_record" output="screen" args="-a"/> -->
 
 </launch>

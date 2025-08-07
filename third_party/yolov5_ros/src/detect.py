@@ -1,3 +1,15 @@
+#!/home/luo/miniconda3/envs/gson/bin/python3
+
+# 
+# Modified from yolov5_ros: https://github.com/mats-robotics/yolov5_ros
+# Original License: GNU General Public License v3.0
+# Copyright (c) 2022 mats-robotics
+#
+# Modifications by: Shangyi Luo (lsylsy030516@gmail.com)
+#
+# This file is part of a GPLv3-licensed project.
+
+
 import sys
 import rospy
 import cv2

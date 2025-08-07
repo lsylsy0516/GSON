@@ -309,7 +309,7 @@ def generate_pseudo_labels():
                     u.rphi_to_xy(anns_rphi[:, 0], anns_rphi[:, 1]), axis=1
                 )
                 gts_occluded = np.logical_not(batch_dict["anns_valid_mask"][ib]).astype(
-                    np.int
+                    np.int8
                 )
                 gts_str = pru.drow_detection_to_kitti_string(gts_xy, None, gts_occluded)
             else:
