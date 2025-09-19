@@ -1,4 +1,4 @@
-#!/home/luo/miniconda3/envs/yolo/bin/python3
+#!/usr/bin/env python3
 
 # -*- coding: utf-8 -*-
 # Modified by: Shangyi Luo (lsylsy030516@gmail.com)
@@ -73,7 +73,7 @@ class ConnectionTracker:
                     proximity = 1.0
                     if bbox_dict and i in bbox_dict and j in bbox_dict:
                         proximity = self.compute_proximity(bbox_dict[i], bbox_dict[j])
-                    new_val = self.fusion_weight * 1 + (1 - self.fusion_weight) * old_val
+                    new_val = self.fusion_weight * proximity + (1 - self.fusion_weight) * old_val
                     self.connection[i][j] = new_val
                 else:
                     self.connection[i][j] = self.decay * old_val
@@ -124,15 +124,12 @@ class ConnectionTracker:
 
             id_to_idx = {track_id: i for i, track_id in enumerate(track_ids)}
 
-            # 获取 connection-based 群组（包含历史 ID）
+            # Get connection-based groups (including historical IDs)
             connected_groups = self.get_connected_groups(threshold=0.6)
-            # rospy.loginfo(f"Connected groups: {connected_groups}")
-            # rospy.loginfo(f"Current track IDs: {track_ids}")
             group_list_msg = []
             included_ids = set()
 
             for group in connected_groups:
-                # 仅保留当前帧中存在的 ID
                 filtered_group = [pid for pid in group if pid in id_to_idx]
                 if not filtered_group:
                     continue
@@ -154,7 +151,7 @@ class ConnectionTracker:
                 included_ids.update(filtered_group)
                 group_list_msg.append(group_msg)
 
-            # 将未被包含的 ID 单独作为 group 添加
+            # Add IDs not included in any group as separate groups
             missing_ids = set(track_ids) - included_ids
             for pid in missing_ids:
                 idx = id_to_idx[pid]

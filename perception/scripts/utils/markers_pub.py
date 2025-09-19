@@ -68,7 +68,7 @@ def marker_array_create(ID_list:list, Pose_list:list, marker_topic:str,color:lis
         marker_msg.pose.orientation.z = 0.0
         marker_msg.pose.orientation.w = 1.0
 
-        marker_msg.scale.z = 0.4  # 设置文本高度
+        marker_msg.scale.z = 0.4 # text height
         marker_msg.color.r = color[0]
         marker_msg.color.g = color[1]
         marker_msg.color.b = color[2]

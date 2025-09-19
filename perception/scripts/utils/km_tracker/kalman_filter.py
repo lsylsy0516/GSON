@@ -60,7 +60,7 @@ class KalmanFilter:
 
 if __name__ == '__main__':
     # Example Usage
-    dt = 0.1    # dt 表示时间间隔
+    dt = 0.1    # Time step
     kf = KalmanFilter(dt,5, np.array([0, 0, 0, 0]), 0.1, 0.1)
 
     # Suppose we have some measurements

@@ -26,7 +26,7 @@ def match(text, ground_truth_ids):
         try:
             if ':' in line:
                 _, rest = line.split(':', 1)
-                ids_str = rest.strip().split(' ')[0]  # 提取 ID 列表部分（遇到解释就截断）
+                ids_str = rest.strip().split(' ')[0]  # Extract ID list part (truncate at explanation)
                 raw_ids = [x.strip() for x in ids_str.split(',') if x.strip().isdigit()]
                 id_list = []
                 for x in raw_ids:
@@ -34,7 +34,7 @@ def match(text, ground_truth_ids):
                     if idx in ground_truth_ids and idx not in used_ids:
                         id_list.append(idx)
                         used_ids.add(idx)
-                if id_list:  # 非空才添加
+                if id_list:  # Add only if not empty
                     result.append(id_list)
         except Exception as e:
             print(f"Failed to parse line: {line}\nError: {e}")
@@ -42,10 +42,10 @@ def match(text, ground_truth_ids):
     return result
 
 def encode_image(image_path):
-  	with open(image_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
 
-def group_with_status(image_path,ground_truth_ids,person_status_dict):
+def group_with_status(image_path, ground_truth_ids, person_status_dict):
     """
     Group people based on their status and ground truth IDs.
     """
@@ -78,8 +78,8 @@ def group_with_status(image_path,ground_truth_ids,person_status_dict):
 
             Each group should be on a separate line with brief reasoning based on image evidence (e.g., "facing each other", "taking photo together", "close and aligned").
             """
-            }
-        ]
+                }
+            ]
         },
         {
             "role": "user",
@@ -118,52 +118,51 @@ def group_naive(image_path, ground_truth_ids):
     base64_image = encode_image(image_path)
     start_time = time.time()
     response = client.chat.completions.create(
-			model=MODEL,
-			messages=[
-			{
-				"role": "system",	
-				"content": [
-					{"type": "text",
-					"text": f"Task: You are a social robot that needs to avoid crowds and ensure you do not disturb the same group of people.  \
-						Grouping Rules:  \
-						- The numbers in the image are for identification only and do not reflect social status. Each number represents a visible person: {ground_truth_ids}. \
-						- Pay close attention to each person's body orientation, facial direction, and interactions to accurately form groups.  \
-						- Group people who are interacting with each other, ensuring all individuals are included in groups,even single is accepted.  \
-      					- People engaged in the same activity should be grouped together (e.g., those taking photos and those posing for photos even not looking to others belong to the same group).  \
-						- Even if individuals are far apart or performing different activities, they should be grouped together if they are interacting.  \
-						- Only include the given IDs in the response. Do not introduce any extra or missing IDs and do not repeat same ID.  \
-						Answer Format (Return only the groups in the following format):  \
-						```\n \
-						group1:1,2,3 \n \
-						group2:4,5 \n \
-						```  \
-						Each group should be on a separate line, with no extra explanations."
-				},
+            model=MODEL,
+            messages=[
+            {
+                "role": "system",    
+                "content": [
+                    {"type": "text",
+                    "text": f"Task: You are a social robot that needs to avoid crowds and ensure you do not disturb the same group of people.  \
+                        Grouping Rules:  \
+                        - The numbers in the image are for identification only and do not reflect social status. Each number represents a visible person: {ground_truth_ids}. \
+                        - Pay close attention to each person's body orientation, facial direction, and interactions to accurately form groups.  \
+                        - Group people who are interacting with each other, ensuring all individuals are included in groups,even single is accepted.  \
+                        - People engaged in the same activity should be grouped together (e.g., those taking photos and those posing for photos even not looking to others belong to the same group).  \
+                        - Even if individuals are far apart or performing different activities, they should be grouped together if they are interacting.  \
+                        - Only include the given IDs in the response. Do not introduce any extra or missing IDs and do not repeat same ID.  \
+                        Answer Format (Return only the groups in the following format):  \
+                        ```\n \
+                        group1:1,2,3 \n \
+                        group2:4,5 \n \
+                        ```  \
+                        Each group should be on a separate line, with no extra explanations."
+                },
 
-				],
-			},
-			{
-				"role": "user",
-				"content":[
-       			{
-					"type": "text",
-					"text": "Here is a picture of robot view,try group those pedestrains ."
-				},
-				{
-					"type": "image_url",
-					"image_url": {
-					"url": f"data:image/jpeg;base64,{base64_image}",
-					},
-				}
-				]
-			}
-			],
-			max_tokens=500,
-			temperature=0.1,
-		)
+                ],
+            },
+            {
+                "role": "user",
+                "content":[
+                {
+                    "type": "text",
+                    "text": "Here is a picture of robot view,try group those pedestrains ."
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image}",
+                    },
+                }
+                ]
+            }
+            ],
+            max_tokens=500,
+            temperature=0.1,
+        )
 
     end_time = time.time()
     print("--------------------")
     print("Use Time:", end_time - start_time)
     return match(response.choices[0].message.content, ground_truth_ids)
-
