@@ -42,7 +42,7 @@ cd ~/catkin_ws
 catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3
 ```
 
-4. you need to download the necessary weight file for **2D LiDAR Ped detection**.In GSON ,we use `ckpt_jrdb_ann_drow3_e40.pth`. Download it from [here]((https://drive.google.com/drive/folders/1Wl2nC8lJ6s9NI1xtWwmxeAUnuxDiiM4W)) and place it in `third_party/2D_lidar_person_detection/dr_spaam_ros/config/`
+4. you need to download the necessary weight file for **2D LiDAR Ped detection**.In GSON ,we use `ckpt_jrdb_ann_drow3_e40.pth`. Download it from [here](https://drive.google.com/drive/folders/1Wl2nC8lJ6s9NI1xtWwmxeAUnuxDiiM4W?usp=sharing) and place it in `third_party/2D_lidar_person_detection/dr_spaam_ros/config/`
 
 5. Some source files in GSON contain hardcoded Python shebangs (e.g., `#!/home/luo/miniconda3/envs/gson/bin/python3`), as well as `#!/usr/bin/python3` in` catkin_ws/devel/lib/yolov5_ros/detect.py`. You need to replace these with the path to your own Conda environment's Python interpreter.
 

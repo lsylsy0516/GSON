@@ -2,19 +2,12 @@ from openai import OpenAI
 from PIL import Image
 from io import BytesIO
 import base64
-import requests
-import re
-import cv2
 import numpy as np
-import json
-import os
 import time
 
-client = OpenAI(
-    base_url="https://adacomp.ngrok.app/v1",
-)
+client = OpenAI()
 
-MODEL = "Qwen/Qwen2.5-VL-32B-Instruct"
+MODEL = "chatgpt-4o-latest"
 
 def match(text, ground_truth_ids):
     result = []

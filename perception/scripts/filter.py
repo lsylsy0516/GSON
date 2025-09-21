@@ -22,7 +22,7 @@ from sensor_msgs.msg import Image
 from geometry_msgs.msg import PoseArray
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 from detection_msgs.msg import BoundingBoxes, Groups, mapping, Group
-from utils.qwen import group_naive
+from utils.gpt import group_naive
 
 
 class ConnectionTracker:
@@ -73,7 +73,7 @@ class ConnectionTracker:
                     proximity = 1.0
                     if bbox_dict and i in bbox_dict and j in bbox_dict:
                         proximity = self.compute_proximity(bbox_dict[i], bbox_dict[j])
-                    new_val = self.fusion_weight * proximity + (1 - self.fusion_weight) * old_val
+                    new_val = self.fusion_weight * 1.0 + (1 - self.fusion_weight) * old_val
                     self.connection[i][j] = new_val
                 else:
                     self.connection[i][j] = self.decay * old_val
@@ -386,7 +386,7 @@ class GroupTracker:
 
             self.tracker.update(llm_groups, bbox_dict)
             filtered_groups = self.tracker.get_connected_groups()
-            self.tracker.print_connections()
+            # self.tracker.print_connections()
 
             result = image.copy()
             h, w, _ = result.shape

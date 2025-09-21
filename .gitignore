@@ -2,3 +2,5 @@
 *.pth
 *.pgm
 *.bag
+
+*__pycache__*
