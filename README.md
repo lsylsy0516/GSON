@@ -46,6 +46,27 @@ catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3
 
 5. Some source files in GSON contain hardcoded Python shebangs (e.g., `#!/home/luo/miniconda3/envs/gson/bin/python3`), as well as `#!/usr/bin/python3` in` catkin_ws/devel/lib/yolov5_ros/detect.py`. You need to replace these with the path to your own Conda environment's Python interpreter.
 
+### Usage
+
+Download our [bag dataset](https://drive.google.com/drive/folders/1wkdO1nTkemAVHYbdTCtVneAQtXDep8tl?usp=sharing)
+
+To run:
+
+1. Source your workspace environment:
+```bash
+source devel/setup.bash
+```
+
+2. Launch the perception module:
+```bash
+roslaunch perception total.launch
+```
+
+3. In a new terminal, play the bag:
+```bash
+rosbag play 2025-03-24-21-29-51.bag
+```
+
 ## Third-party Code and Licenses
 
 This repository incorporates and modifies code from the following open-source projects:
